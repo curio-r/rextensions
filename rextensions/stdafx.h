@@ -15,9 +15,10 @@ template<typename T>
 union _void_cast_u
 {
 	T Fn;
-	void *Ptr;
+	char *Ptr;
 
 	inline _void_cast_u(T fn) : Fn(fn) {}
 };
 
+// Required for casting class method pointers
 #define void_cast(T) ((_void_cast_u<decltype(T)>{T}).Ptr)

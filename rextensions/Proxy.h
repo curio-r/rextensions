@@ -1,8 +1,10 @@
 #pragma once
 
 template<typename Class>
-struct BaseProxy
+struct BaseProxy : public Class
 {
+	typedef Class ProxyClass;
+
 	template<typename Func>
 	struct MethodRef
 	{

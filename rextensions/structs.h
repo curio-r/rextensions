@@ -1,6 +1,136 @@
 #pragma once
 #include <list>
 #include <map>
+#include <vector>
+#include "enum.h"
+
+struct CAttrCell
+{
+	float h1;
+	float h2;
+	float h3;
+	float h4;
+	int flag;
+};
+
+struct C3dAttr
+{
+	size_t dummy[68];
+	size_t m_width;
+	size_t m_height;
+	size_t dword_dummy0;
+	size_t dword_dummy2;
+	CAttrCell *cells;
+};
+
+struct CMouse
+{
+	void *m_lpdi;
+	void *m_pMouse;
+	void *m_hevtMouse;
+	int m_xDelta;
+	int m_yDelta;
+	int m_xPos;
+	int m_yPos;
+	size_t m_wheel;
+	EBtnState m_oldBtnState[2];
+	EBtnState m_btnState[2];
+	size_t m_dblclkCnt[3];
+	size_t m_dblclkTime;
+	size_t m_bSwapButton;
+};
+
+typedef struct vector3d
+{
+	float x, y, z;
+} vector3d;
+
+struct CGameMode
+{
+	size_t dword_0;
+	size_t dword_4;
+	size_t dword_8;
+	size_t dword_C;
+	size_t dword_10;
+	size_t dword_14;
+	size_t dword_18;
+	size_t dword_1C;
+	size_t dword_20;
+};
+
+struct CActorPickInfo
+{
+	vector3d m_vectors[2];
+	unsigned int m_gid;
+	int m_job;
+	int m_classType;
+	int m_isPkState;
+};
+
+struct CActorPickNode
+{
+	size_t dword_0;
+	size_t dword_4;
+	size_t dword_8;
+	size_t dword_C;
+	size_t dword_10;
+	size_t dword_14;
+	size_t dword_18;
+	size_t dword_1C;
+	size_t dword_20;
+};
+
+struct CResMgr
+{
+	size_t dword_0;
+	size_t dword_4;
+	size_t dword_8;
+	size_t dword_C;
+	size_t dword_10;
+	size_t dword_14;
+	size_t dword_18;
+	size_t dword_1C;
+	size_t dword_20;
+};
+
+struct CWorld
+{
+	size_t dword_0;
+	size_t dword_4;
+	size_t dword_8;
+	size_t dword_C;
+	size_t dword_10;
+	size_t dword_14;
+	size_t dword_18;
+	size_t dword_1C;
+	size_t dword_20;
+};
+
+struct CSession
+{
+	size_t dword_0;
+	size_t dword_4;
+	size_t dword_8;
+	size_t dword_C;
+	size_t dword_10;
+	size_t dword_14;
+	size_t dword_18;
+	size_t dword_1C;
+	size_t dword_20;
+};
+
+struct CRagConnection
+{
+	size_t dword_0;
+	size_t dword_4;
+	size_t dword_8;
+	size_t dword_C;
+	size_t dword_10;
+	size_t dword_14;
+	size_t dword_18;
+	size_t dword_1C;
+	size_t dword_20;
+};
 
 struct CModeMgr
 {
@@ -79,6 +209,20 @@ struct StringAndColor
 	unsigned int Color;
 };
 
+struct UIWindow
+{
+	void * vftable;
+	size_t dword_0;
+	size_t dword_4;
+	size_t dword_8;
+	size_t dword_C;
+	size_t dword_10;
+	size_t dword_14;
+	size_t dword_18;
+	size_t dword_1C;
+	size_t dword_20;
+};
+
 struct UIWindowMgr
 {
 	int m_chatWndX;
@@ -129,58 +273,58 @@ struct UIWindowMgr
 	void *m_itemPurchaseWnd;
 	void *m_itemSellWnd;
 	void *m_chooseSellBuyWnd;
-	void *m_chatRoomMakeWnd; 
-	void *m_chatRoomChangeWnd; 
+	void *m_chatRoomMakeWnd;
+	void *m_chatRoomChangeWnd;
 	void *m_chatRoomWnd;
-	void *m_passwordWnd; 
+	void *m_passwordWnd;
 	void *m_exchangeWnd;
-	void *m_exchangeAcceptWnd; 
+	void *m_exchangeAcceptWnd;
 	void *m_itemStoreWnd;
 	void *m_skillListWnd;
-	void *m_messengerGroupWnd; 
-	void *m_joinPartyAcceptWnd; 
-	void *m_CoupleAcceptWnd; 
-	void *m_BabyAcceptWnd; 
-	void *m_joinGuildAcceptWnd; 
-	void *m_allyGuildAcceptWnd; 
-	void *m_tipOfTheDayWnd; 
+	void *m_messengerGroupWnd;
+	void *m_joinPartyAcceptWnd;
+	void *m_CoupleAcceptWnd;
+	void *m_BabyAcceptWnd;
+	void *m_joinGuildAcceptWnd;
+	void *m_allyGuildAcceptWnd;
+	void *m_tipOfTheDayWnd;
 	void *m_merchantItemWnd;
-	void *m_merchantMirrorItemWnd; 
-	void *m_merchantShopMakeWnd; 
-	void *m_merchantItemShopWnd; 
+	void *m_merchantMirrorItemWnd;
+	void *m_merchantShopMakeWnd;
+	void *m_merchantItemShopWnd;
 	void *m_merchantItemMyShopWnd;
-	void *m_merchantItemPurchaseWnd; 
-	void *m_partySettingWnd; 
-	void *m_skillNameChangeWnd; 
+	void *m_merchantItemPurchaseWnd;
+	void *m_partySettingWnd;
+	void *m_skillNameChangeWnd;
 	void *m_npcEditDialogWnd;
 	void *m_npcTextEditDialogWnd;
-	void *m_detailLevelWnd; 
+	void *m_detailLevelWnd;
 	void *m_notifyItemObtainWnd;
-	void *m_guildInfoManageWnd; 
-	void *m_guildMemberManageWnd; 
-	void *m_guildPositionManageWnd; 
-	void *m_guildSkillWnd; 
-	void *m_guildBanishedMemberWnd; 
-	void *m_guildNoticeWnd; 
-	void *m_guildTotalInfoWnd; 
-	void *m_whisperListWnd; 
-	void *m_friendOptionWnd; 
-	void *m_guildLeaveReasonDescWnd; 
-	void *m_guildBanReasonDescWnd; 
+	void *m_guildInfoManageWnd;
+	void *m_guildMemberManageWnd;
+	void *m_guildPositionManageWnd;
+	void *m_guildSkillWnd;
+	void *m_guildBanishedMemberWnd;
+	void *m_guildNoticeWnd;
+	void *m_guildTotalInfoWnd;
+	void *m_whisperListWnd;
+	void *m_friendOptionWnd;
+	void *m_guildLeaveReasonDescWnd;
+	void *m_guildBanReasonDescWnd;
 	void *m_illustWnd;
 	void *m_metalListWnd;
-	void *m_metalProcessWnd; 
-	void *m_metalResultWnd; 
-	void *m_emotionWnd; 
-	void *m_emotionListWnd; 
-	void *m_prohibitListWnd; 
+	void *m_metalProcessWnd;
+	void *m_metalResultWnd;
+	void *m_emotionWnd;
+	void *m_emotionListWnd;
+	void *m_prohibitListWnd;
 	void *m_petInfoWnd;
-	void *m_selectPetEggWnd; 
+	void *m_selectPetEggWnd;
 	void *m_petTamingDeceiveWnd;
 	void *m_makingArrowListWnd;
 	void *m_selectCartWnd;
-	void *m_spellListWnd; 
-	void *m_showNeedItemListWnd; 
+	void *m_spellListWnd;
+	void *m_showNeedItemListWnd;
 	void *m_candidateWnd;
 	void *m_compositionWnd;
 	void *m_keyStrokeWnd;

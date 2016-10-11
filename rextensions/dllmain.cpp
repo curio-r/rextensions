@@ -7,110 +7,15 @@
 
 #include "ProcMem.h"
 #include "Composer.h"
-#include "Proxy.h"
-
-#include "structs.h"
-#include "overrides.h"
+#include "ProxyImpl.h"
+#include "Hooks.h"
 
 #define PROC_HOOK(NAME) GLOBAL_HOOK_##NAME
-
-BOOL CALLBACK ImportFileCallback(
-	PVOID pContext,
-	HMODULE nOrdinal,
-	PCSTR pszName
-	)
-{
-	if (pszName != nullptr)
-	{
-		printf(pszName);
-	}
-
-	return TRUE;
-}
 
 void ErrorMsg(std::string msg)
 {
 	MessageBoxA(NULL, msg.c_str(), "Error", 0);
 }
-
-struct UIWindowMgrProxy : public ClassProxy<UIWindowMgr>
-{
-	static MethodRef<void *(__thiscall UIWindowMgr::*)(int windowId)> MakeWindow;
-
-	UIWindowMgrProxy& operator=(UIWindowMgr * Instance)
-	{
-		_Instance = Instance;
-
-		return *this;
-	}
-} g_windowMgr;
-
-UIWindowMgrProxy::MethodRef<void *(__thiscall UIWindowMgr::*)(int windowId)> UIWindowMgrProxy::MakeWindow;
-
-struct CRendererProxy : public ClassRefProxy<CRenderer>
-{
-	static MethodRef<size_t(__thiscall CRenderer::*)(void)> DrawScene;
-	static MethodRef<size_t(__thiscall CRenderer::*)(int x, int y, char *text, unsigned int colorRef)> TextOutScreen;
-
-	CRendererProxy& operator=(CRenderer ** Instance)
-	{
-		_Instance = Instance;
-
-		return *this;
-	}
-} g_renderer;
-
-CRendererProxy::MethodRef<size_t(__thiscall CRenderer::*)(void)> CRendererProxy::DrawScene;
-CRendererProxy::MethodRef<size_t(__thiscall CRenderer::*)(int x, int y, char *text, unsigned int colorRef)> CRendererProxy::TextOutScreen;
-
-struct CModeMgrProxy : public ClassProxy<CModeMgr>
-{
-	static MethodRef<size_t (CModeMgr::*)(int modeType, char *modeName)> Switch;
-	
-	CModeMgrProxy& operator=(CModeMgr * Instance)
-	{
-		_Instance = Instance;
-
-		return *this;
-	}
-} g_modeMgr;
-
-CModeMgrProxy::MethodRef<size_t(CModeMgr::*)(int modeType, char *modeName)> CModeMgrProxy::Switch;
-
-struct UIWindowMgrHook : UIWindowMgr
-{
-	void MakeWindow(int windowId)
-	{
-		UIWindowMgrProxy::MakeWindow(this, windowId);
-	}
-};
-
-struct CModeMgrHook : CModeMgr
-{
-	size_t Switch(int modeType, char *modeName)
-	{
-		return CModeMgrProxy::Switch(this, modeType, modeName);
-	}
-};
-
-struct CRendererHook : CRenderer
-{
-	size_t DrawScene()
-	{
-		auto result = CRendererProxy::DrawScene(this);
-
-		CRendererProxy::TextOutScreen(this, this->m_width - 108 + 1, this->m_height - 20 + 1, (char *)"Curiosity Client", 0x000000);
-		CRendererProxy::TextOutScreen(this, this->m_width - 108 + 0, this->m_height - 20 + 0, (char *)"Curiosity Client", 0xFFFFFF);
-
-		return result;
-	}
-};
-
-static_assert(!std::is_polymorphic<struct CRendererHook>::value, "Struct has virtual function table");
-static_assert(!std::is_polymorphic<struct CModeMgrHook>::value, "Struct has virtual function table");
-static_assert(!std::is_polymorphic<struct UIWindowMgrHook>::value, "Struct has virtual function table");
-
-BOOL(*CheckSystemMessage)();
 
 class ClientGlobals
 {
@@ -142,6 +47,196 @@ public:
 		{
 			ErrorMsg("Unable to find mode manager");
 		}
+
+		if (!FindConnection())
+		{
+			ErrorMsg("Unable to find connection");
+		}
+
+		if (!FindSession())
+		{
+			ErrorMsg("Unable to find talktype");
+		}
+
+		if (!FindWorldAndResMgr())
+		{
+			ErrorMsg("Unable to find world");
+		}
+
+		if (!FindPickNode())
+		{
+			ErrorMsg("Can't find pick node");
+		}
+
+		if (!FindGameMode())
+		{
+			ErrorMsg("Can't find game mode");
+		}
+
+		if (!FindMouse())
+		{
+			ErrorMsg("Can't find mouse");
+		}
+	}
+
+	bool FindMouse()
+	{
+		// Very bad check, can easily be wrong!!
+
+		auto query = m_client->FromCallTo((BYTE *)CheckSystemMessage)
+			.FindBelow({ 0xE8 })
+			.If().FindBelow({ 
+				0xB9, 0xCC, 0xCC, 0xCC, 0xCC, // mov ecx, offset ? (g_mouse)
+				0xE8 // call ? (CMouse::ReadState)
+			}, 11, true);
+
+		g_mouse = (CMouse *)*(CMouse**)(query.GetOne() + 6);
+
+		proxy(CMouse)::ReadState = ProcMem::DecodeCallAddress(query.GetOne() + 10);
+
+		return true;
+	}
+
+	bool FindGameMode()
+	{
+		return true;
+	}
+
+	bool FindPickNode()
+	{
+		auto AddInfo = m_client->FromCode({ 
+				0xD1, 0xF9, // sar ecx, 1
+				0xD1, 0xF8, // sar eax, 1
+				0x3B, 0xF9 // cmp edi, ecx
+			})
+			.FindStartOfFunctionByCall(0x10, 3, 70);
+
+		if (AddInfo.Count() != 1)
+		{
+			return false;
+		}
+
+		proxy(CActorPickNode)::AddPickInfo = AddInfo.GetOne();
+
+		return true;
+	}
+
+	bool FindWorldAndResMgr()
+	{
+		char bytes[] = { 0x77u, 0x6Fu, 0x72u, 0x6Cu, 0x64u, 0xBFu, 0xA1u, 0x20u,
+			0x4Eu, 0x55u, 0x4Cu, 0x4Cu, 0xB0u, 0xAAu, 0xC0u, 0xCCu, 0x00u };
+
+		auto OnEnterFrame = m_client->FromString(bytes)
+			.FindReferences()
+			.FindStartOfFunction();
+
+		if (OnEnterFrame.Count() == 0)
+		{
+			return false;
+		}
+
+		proxy(CWorld)::OnEnterFrame = OnEnterFrame.GetOne();
+
+		auto ref_resmgr = m_client->FromString(bytes)
+			.FindReferences()
+			.First()
+			.FindAbove({
+				0xE8, 0xCC, 0xCC, 0xCC, 0xCC, // call ? (g_resMgr)
+				0x8B, 0xC8, // mov ecx, eax (this = g_resMgr())
+				0xE8 // call ? (CResMgr::Get)
+			}, 100, true);
+
+		if (ref_resmgr.Count() == 0)
+		{
+			return false;
+		}
+
+		g_resMgr = (decltype(g_resMgr))ProcMem::DecodeCallAddress(ref_resmgr.GetOne());
+
+		proxy(CResMgr)::Get = ProcMem::DecodeCallAddress(ref_resmgr.GetOne() + 7);
+
+		return true;
+	}
+
+	bool FindSession()
+	{
+		char bytes[] = { 0x2Fu, 0xA4u, 0xD3u, 0xA4u, 0xD0u, 0x00u };
+
+		auto GetTalkType = m_client->FromString(bytes)
+			.FindReferences()
+			.FindStartOfFunction(3, 0, 500)
+			.GetOne();
+
+		if (GetTalkType == nullptr)
+		{
+			return false;
+		}
+
+		proxy(CSession)::GetTalkType = GetTalkType;
+
+		auto ref_mov = m_client->FromCallTo(GetTalkType)
+			.FindAbove({ 0xB9 }, 5); // mov ecx, ?
+
+		g_session = (CSession *)*(size_t *)(ref_mov.GetMostCommonBytes(4) + 1);
+
+		return true;
+	}
+
+	bool FindConnection()
+	{
+		// Find CConnection::s_wsSend, CConnection::s_wsRecv
+		
+		auto q = m_client->FromString("ws2_32.dll")
+			.FindReferences()
+			.FindBelow({ 0xFF, 0x15 }, 10) // call ? (LoadLibraryA)
+			.Unless().FindReferencesToImportBelow("KERNEL32.dll", "FreeLibrary")
+			.First()
+			.FindBelow({ 0xA3 }); // mov ?, eax
+		
+		if (q.Count() < 3)
+		{
+			return false;
+		}
+
+		proxy(CRagConnection)::s_wsSend = (decltype(proxy(CRagConnection)::s_wsSend))*(BYTE **)(q.GetNth(2) + 1);
+		proxy(CRagConnection)::s_wsRecv = (decltype(proxy(CRagConnection)::s_wsRecv))*(BYTE **)(q.GetNth(3) + 1);
+		
+		// Find CConnection::OnSend
+
+		auto OnSend = m_client->FromOffset(proxy(CRagConnection)::s_wsSend)
+			.FindReferences()
+			.First()
+			.FindStartOfFunction()
+			.GetOne();
+
+		proxy(CRagConnection)::OnSend = OnSend;
+
+		// Find CRagConnection::SendPacket
+
+		proxy(CRagConnection)::SendPacket = m_client->FromCallTo(OnSend)
+			.FindStartOfFunction(100)
+			.GetOne();
+
+		// Find CRagConnection::RecvPacket
+
+		auto q2 = m_client->FromCallTo((BYTE *)CheckSystemMessage) // CLoginMode::OnUpdate
+			.FindBelow({ 0x8B, 0xCE }, 8) // mov ecx, esi
+			.FindBelow({ 0xE8 }, 3) // call ? (CLoginMode::PollNetworkState)
+			.FollowCall()
+			.FindBelow({ 
+				0x8B, 0xC8, // mov ecx, eax
+				0xE8, 0xCC, 0xCC, 0xCC, 0xCC, // call ? (CRagConnection::RecvPacket)
+				0x84, 0xC0, // cmp al, al
+				0x0F  // jz ?
+			}, 300, true);
+
+		proxy(CRagConnection)::RecvPacket = (void *)ProcMem::DecodeCallAddress(q2.GetOne() + 2);
+
+		// CRagConnection::instanceR is now right above
+
+		proxy(CRagConnection)::instanceR = (decltype(proxy(CRagConnection)::instanceR))ProcMem::DecodeCallAddress(q2.FindAbove({ 0xE8 }).GetOne());
+		
+		return true;
 	}
 
 	bool FindModeMgr()
@@ -162,7 +257,7 @@ public:
 
 		auto addr2 = m_client->FromCallTo(addr)
 			.FindAbove({ 0xB9 }, 5, false) // mov ecx, ?
-			.GetMostCommon();
+			.GetMostCommonCall();
 
 		g_modeMgr = (CModeMgr *)((void *)*(DWORD *)(addr2 + 1));
 
@@ -193,7 +288,7 @@ public:
 			return false;
 		}
 
-		CRendererProxy::TextOutScreen = (void *)ProcMem::DecodeCallAddress(addr2);
+		proxy(CRenderer)::TextOutScreen = (void *)ProcMem::DecodeCallAddress(addr2);
 
 		// DrawScene
 
@@ -208,7 +303,7 @@ public:
 			return false;
 		}
 
-		CRendererProxy::DrawScene = (void *)ProcMem::DecodeCallAddress(addr3);
+		proxy(CRenderer)::DrawScene = (void *)ProcMem::DecodeCallAddress(addr3);
 
 		return true;
 	}
@@ -230,14 +325,14 @@ public:
 			.FindReferences()
 			.FindAbove({ 0x6A, 0x01, 0x6A, 0x11, 0x6a, 0x79 }) // push 1h; push 11h; push 79h
 			.FindAbove({ 0x6A, 0x06, 0xB9 }); // push 6h; mov ecx ?
-		
+
 		auto va = q.GetOne();
 
 		if (va == nullptr)
 		{
 			return false;
 		}
-		
+
 		g_windowMgr = (UIWindowMgr *)((void *)*(DWORD *)(va + 3));
 
 		auto va2 = q.FindBelow({ 0xE8 }).GetOne(); // call ?
@@ -249,16 +344,48 @@ public:
 
 		g_windowMgr.MakeWindow = (void *)ProcMem::DecodeCallAddress(va2);
 
+#define BYTES_OF(PTR) ((BYTE *)&(void *)PTR)[0], ((BYTE *)&(void *)PTR)[1], ((BYTE *)&(void *)PTR)[2], ((BYTE *)&(void *)PTR)[3]
+
+		void * Ptr = g_windowMgr;
+
+		auto query2 = m_client->FromString(" is Saved.")
+			.FindReferences()
+			.FindBelow({ 0xB9, BYTES_OF(Ptr) }) // mov ecx, offset g_windowMgr
+			.FindBelow({ 0xE8 }); // call ?
+
+		g_windowMgr.SendMsg = (void *)ProcMem::DecodeCallAddress(query2.GetMostCommonCall());
+
+
+		// UIWindowMgr::Drop
+
+		auto query3 = m_client->FromCode({ 0x68, 0xB2, 0x02, 0x00, 0x00 }) // CModeMgr::SendMsg+?
+			.FindAbove({ 
+				0xB9, BYTES_OF(Ptr), // mov eax, offset g_windowMgr
+				0xE8, 0xCC, 0xCC, 0xCC, 0xCC, // call ? (UIWindowMgr::Drop)
+				0x84, 0xC0 // test al, al
+			}, 200, true);
+
+		if (query3.Count() == 0)
+		{
+			return false;
+		}
+
+		auto Drop = (BYTE *)ProcMem::DecodeCallAddress(query3.GetOne() + 5);
+
+		auto ref_call = m_client->FromOffset(Drop)
+			.FindBelow({ 0xE8 })
+			.GetOne();
+
+		if (ref_call == nullptr)
+		{
+			return false;
+		}
+		
+		proxy(UIWindowMgr)::HitTest = ProcMem::DecodeCallAddress(ref_call);
+
 		return true;
 	}
 };
-
-BOOL PROC_HOOK(CheckSystemMessage)()
-{
-	CheckSystemMessage();
-
-	return TRUE;
-}
 
 #define AttachHook(PTR, FN) _AttachHook(PTR, FN, #FN)
 template<typename T1, typename T2>
@@ -276,13 +403,22 @@ bool _AttachHook(T1 &&_Ptr, T2 &&_Fn, const std::string &_Name)
 
 bool InstallHooks()
 {
+#define AttachMethodHook(CLASS, METHOD) AttachHook(proxy(CLASS) :: METHOD, void_cast(& CLASS##Hook :: METHOD))
+
 	DetourTransactionBegin();
 
-	if (AttachHook(CheckSystemMessage, PROC_HOOK(CheckSystemMessage)) &&
-		AttachHook(CRendererProxy::DrawScene, void_cast(&CRendererHook::DrawScene)) &&
-		AttachHook(CModeMgrProxy::Switch, void_cast(&CModeMgrHook::Switch)) &&
-		AttachHook(UIWindowMgrProxy::MakeWindow, void_cast(&UIWindowMgrHook::MakeWindow)))
-	{
+	if (AttachHook(CheckSystemMessage, CheckSystemMessageHook) &&
+		AttachMethodHook(CRenderer, DrawScene) &&
+		AttachMethodHook(CModeMgr, Switch) &&
+		AttachMethodHook(UIWindowMgr, MakeWindow) &&
+		AttachMethodHook(CRagConnection, SendPacket) &&
+		AttachMethodHook(CRagConnection, RecvPacket) &&
+		AttachMethodHook(CSession, GetTalkType) &&
+		AttachMethodHook(CWorld, OnEnterFrame) &&
+		AttachMethodHook(CActorPickNode, AddPickInfo) &&
+		AttachMethodHook(UIWindowMgr, HitTest) &&
+		AttachMethodHook(CMouse, ReadState)
+	) {
 		DetourTransactionCommit();
 		
 		return true;

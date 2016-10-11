@@ -19,32 +19,60 @@ class BinarySearchComposer
 		}
 
 		class ProcMem *m_mem;
-		std::vector<BYTE *> m_curResults;
+		std::vector<BYTE *> m_results;
 
-		std::vector<BYTE *> Expand(const std::function<std::vector<BYTE *>(class ProcMem *, BYTE *)>& fn)
+		enum MODE
 		{
-			std::vector<BYTE *> newResults;
+			REPLACE,
+			WHERE,
+			NOT_WHERE
+		} m_mode;
 
-			for (auto curRef : m_curResults)
+		bool m_isDont = false;
+
+		std::vector<BYTE *> Apply(const std::function<std::vector<BYTE *>(class ProcMem *, BYTE *)>& fn)
+		{
+			std::vector<BYTE *> results;
+
+			for (auto current : m_results)
 			{
-				auto newRefs = fn(m_mem, curRef);
-
-				newResults.insert(newResults.end(), newRefs.begin(), newRefs.end());
+				auto candidates = fn(m_mem, current);
+				
+				switch(m_mode)
+				{
+					case WHERE:
+						if (candidates.size() > 0)
+						{
+							results.push_back(current);
+						}
+						break;
+					case NOT_WHERE:
+						if (candidates.size() == 0)
+						{
+							results.push_back(current);
+						}
+					default:
+						results.insert(results.end(), candidates.begin(), candidates.end());
+				}
 			}
 
-			return newResults;
+			// Reset mode
+			m_mode = REPLACE;
+
+			return results;
 		}
 
 		void Propagate(const std::function<std::vector<BYTE *>(class ProcMem *, BYTE *)>& fn)
 		{
-			m_curResults = Expand(fn);
+			m_results = Apply(fn);
 		}
 
-	public:
+		static SEGMENT MakeSegmentByRange(BYTE *ref, size_t range, SEARCH_DIRECTION direction)
+		{
+			auto down = direction == ProcMem::SEARCH_DOWN;
 
-		static const size_t DEFAULT_SEARCH_RANGE = 200;
-
-	private:
+			return{ down ? ref : ref - range, down ? ref + range : ref };
+		}
 
 		State& FindString(const std::string &string)
 		{
@@ -52,19 +80,21 @@ class BinarySearchComposer
 
 			if (result != nullptr)
 			{
-				m_curResults.push_back(result);
+				m_results.push_back(result);
 			}
 
 			return *this;
 		}
 
 	public:
+		
+		static const size_t DEFAULT_SEARCH_RANGE = 200;
 
 		State& FindReferences()
 		{
 			Propagate([](class ProcMem *mem, BYTE *ref)
 			{
-				return mem->FindAllReferences(ref);
+				return mem->FindAllReferences(ref, mem->GetSectionByName(".text"));
 			});
 
 			return *this;
@@ -74,23 +104,50 @@ class BinarySearchComposer
 		{
 			Propagate([&bytes, range, direction, wildcard](class ProcMem *mem, BYTE *ref)
 			{
-				auto down = direction == ProcMem::SEARCH_DOWN;
-
-				ProcMem::SEGMENT segment{ down ? ref : ref - range, down ? ref + range : ref };
-
+				auto segment = MakeSegmentByRange(ref, range, direction);
+				
 				return mem->FindAllBytes(bytes, segment, wildcard, direction);
 			});
 
 			return *this;
 		}
 
-		State& FindStartOfFunction(bool requireCall = false, bool requireReference = false)
+		State& FindStartOfFunctionByCall(size_t align, size_t numCallsRequired = 1, size_t range = DEFAULT_SEARCH_RANGE)
+		{
+			Propagate([align, numCallsRequired, range](class ProcMem *mem, BYTE *ref)->std::vector<BYTE *>
+			{
+				auto alignPointer = [align](BYTE *ptr)
+				{
+					return (BYTE *)((size_t)ptr & ~(align - 1));
+				};
+
+				auto base = ref - range;
+				auto segment = mem->GetSectionByName(".text");
+
+				do
+				{
+					ref = alignPointer(ref);
+
+					if (mem->FindCallsTo(ref, segment).size() >= numCallsRequired)
+					{
+						return { ref };
+					}
+
+				} while (ref-- > base);
+
+				return {};
+			});
+
+			return *this;
+		}
+
+		State& FindStartOfFunction(size_t numCallsRequired = 0, size_t numReferencesRequired = 0, size_t range = DEFAULT_SEARCH_RANGE)
 		{
 			auto mem = m_mem;
 
-			std::transform(m_curResults.begin(), m_curResults.end(), m_curResults.begin(), [mem](BYTE *curRef) -> BYTE *
+			std::transform(m_results.begin(), m_results.end(), m_results.begin(), [mem, range](BYTE *curRef) -> BYTE *
 			{
-				SEGMENT s{ curRef - DEFAULT_SEARCH_RANGE, curRef };
+				SEGMENT s { curRef - range, curRef };
 				BYTE *addr;
 
 				// Try to find frame size setup
@@ -130,10 +187,10 @@ class BinarySearchComposer
 				return nullptr;
 			});
 
-			std::remove_if(m_curResults.begin(), m_curResults.end(), [](BYTE *curRef) -> bool
+			m_results.erase(std::remove_if(m_results.begin(), m_results.end(), [](BYTE *curRef) -> bool
 			{
 				return curRef == nullptr;
-			});
+			}), m_results.end());
 
 			Propagate([](class ProcMem *mem, BYTE *ref) -> std::vector<BYTE *>
 			{
@@ -181,33 +238,104 @@ class BinarySearchComposer
 				return{};
 			});
 
-			if (requireCall)
+			auto segment = m_mem->GetSectionByName(".text");
+
+			if (numCallsRequired)
 			{
-				std::remove_if(m_curResults.begin(), m_curResults.end(), [mem](BYTE *refAddr) -> bool
+				m_results.erase(std::remove_if(m_results.begin(), m_results.end(), [mem, segment, numCallsRequired](BYTE *refAddr) -> bool
 				{
-					return mem->FindCallsTo(refAddr).size() == 0;
-				});
+					return mem->FindCallsTo(refAddr, segment).size() < numCallsRequired;
+				}), m_results.end());
 			}
 
-			if (requireReference)
+			if (numReferencesRequired)
 			{
-				std::remove_if(m_curResults.begin(), m_curResults.end(), [mem](BYTE *refAddr) -> bool
+				m_results.erase(std::remove_if(m_results.begin(), m_results.end(), [mem, segment, numReferencesRequired](BYTE *refAddr) -> bool
 				{
-					return mem->FindReference(refAddr) == nullptr;
-				});
+					return mem->FindAllReferences(refAddr, segment).size() < numReferencesRequired;
+				}), m_results.end());
 			}
 
 			return *this;
 		}
 
-		State& FindCallsTo()
+		State& FindCallsToCurrentAddress()
 		{
 			Propagate([](class ProcMem *mem, BYTE *ref)
 			{
-				return mem->FindCallsTo(ref);
+				return mem->FindCallsTo(ref, mem->GetSectionByName(".text"));
 			});
 
 			return *this;
+		}
+
+		State& FindCallsTo(BYTE *address, size_t range, SEARCH_DIRECTION direction)
+		{
+			auto segment = MakeSegmentByRange(address, range, direction);
+			
+			Propagate([segment, direction](class ProcMem *mem, BYTE *ref)
+			{
+				return mem->FindCallsTo(ref, segment, direction);
+			});
+
+			return *this;
+		}
+
+		State& FindCallsToAbove(BYTE *address, size_t range)
+		{
+			return FindCallsTo(address, range, SEARCH_DIRECTION::SEARCH_UP);
+		}
+
+		State& FindCallsToBelow(BYTE *address, size_t range)
+		{
+			return FindCallsTo(address, range, SEARCH_DIRECTION::SEARCH_DOWN);
+		}
+
+		State& FindReferencesToAddress(BYTE *address, size_t range, SEARCH_DIRECTION direction)
+		{
+			auto segment = MakeSegmentByRange(address, range, direction);
+
+			Propagate([segment](class ProcMem *mem, BYTE *ref)
+			{
+				return mem->FindAllReferences(ref, segment);
+			});
+
+			return *this;
+		}
+
+		State& FollowCall()
+		{
+			Propagate([](class ProcMem *mem, BYTE *ref) -> std::vector<BYTE *>
+			{
+				return { (BYTE *)mem->DecodeCallAddress(ref) };
+			});
+
+			return *this;
+		}
+
+		State& FindReferencesToAddressAbove(BYTE *address, size_t range = DEFAULT_SEARCH_RANGE)
+		{
+			return FindReferencesToAddress(address, range, SEARCH_DIRECTION::SEARCH_UP);
+		}
+
+		State& FindReferencesToAddressBelow(BYTE *address, size_t range = DEFAULT_SEARCH_RANGE)
+		{
+			return FindReferencesToAddress(address, range, SEARCH_DIRECTION::SEARCH_DOWN);
+		}
+		
+		State& FindReferencesToImport(const char *moduleName, const char *procName, size_t range, SEARCH_DIRECTION direction)
+		{
+			return FindReferencesToAddress(m_mem->GetImportTableAddress(moduleName, procName), range, direction);
+		}
+
+		State& FindReferencesToImportAbove(const char *moduleName, const char *procName, size_t range = DEFAULT_SEARCH_RANGE)
+		{
+			return FindReferencesToImport(moduleName, procName, range, SEARCH_DIRECTION::SEARCH_UP);
+		}
+
+		State& FindReferencesToImportBelow(const char *moduleName, const char *procName, size_t range = DEFAULT_SEARCH_RANGE)
+		{
+			return FindReferencesToImport(moduleName, procName, range, SEARCH_DIRECTION::SEARCH_DOWN);
 		}
 
 		State& FindAbove(const std::vector<BYTE> &bytes, size_t range = DEFAULT_SEARCH_RANGE, bool wildcard = false)
@@ -222,12 +350,14 @@ class BinarySearchComposer
 
 		State& Nth(size_t N)
 		{
-			if (m_curResults.size() > N)
-			{
-				auto nth = m_curResults[N];
+			N -= 1;
 
-				m_curResults.clear();
-				m_curResults.push_back(nth);
+			if (m_results.size() > N)
+			{
+				auto nth = m_results[N];
+
+				m_results.clear();
+				m_results.push_back(nth);
 			}
 
 			return *this;
@@ -240,57 +370,97 @@ class BinarySearchComposer
 
 		State& Last()
 		{
-			if (m_curResults.size() > 0)
+			if (m_results.size() > 0)
 			{
-				return Nth(m_curResults.size() - 1);
+				return Nth(m_results.size() - 1);
 			}
+
+			return *this;
+		}
+
+		State& If()
+		{
+			m_mode = WHERE;
+
+			return *this;
+		}
+
+		State& Unless()
+		{
+			m_mode = NOT_WHERE;
 
 			return *this;
 		}
 
 		size_t Count()
 		{
-			return m_curResults.size();
+			return m_results.size();
 		}
 
-		BYTE * GetMostCommon()
+		BYTE * GetMostCommon(std::function<bool(BYTE *, BYTE *)> cmp)
 		{
-			auto &results = m_curResults;
+			auto &results = m_results;
 
 			if (results.size() == 0)
 			{
 				return nullptr;
 			}
 
-			return *std::max_element(m_curResults.begin(), m_curResults.end(), [results](BYTE *lhs, BYTE *rhs) -> bool
+			return *std::max_element(results.begin(), results.end(), [results, cmp](BYTE *lhs, BYTE *rhs) -> bool
 			{
-				auto count1 = std::count_if(results.begin(), results.end(), [lhs](BYTE *addr)
+				auto num_equals = [results, cmp](BYTE *cur)
 				{
-					return *(size_t *)lhs == *(size_t *)addr;
-				});
+					return std::count_if(results.begin(), results.end(), [cmp, cur](BYTE *addr)
+					{
+						return cmp(cur, addr);
+					});
+				};
 
-				auto count2 = std::count_if(results.begin(), results.end(), [rhs](BYTE *addr)
-				{
-					return *(size_t *)rhs == *(size_t *)addr;
-				});
+				return num_equals(lhs) < num_equals(rhs);
+			});
+		}
 
-				return count1 < count2;
+		BYTE * GetMostCommonBytes(size_t n = 1)
+		{
+			return GetMostCommon([n](BYTE *lhs, BYTE *rhs)
+			{
+				return std::memcmp(lhs, rhs, n) == 0;
+			});
+		}
+
+		BYTE * GetMostCommonCall()
+		{
+			return GetMostCommon([](BYTE *lhs, BYTE *rhs)
+			{
+				return ProcMem::DecodeCallAddress(lhs) == ProcMem::DecodeCallAddress(rhs);
 			});
 		}
 
 		BYTE * GetOne()
 		{
-			if (m_curResults.size() == 0)
+			if (m_results.size() == 0)
 			{
 				return nullptr;
 			}
 
-			return m_curResults[0];
+			return m_results[0];
 		}
 
 		std::vector<BYTE *> GetAll()
 		{
-			return m_curResults;
+			return m_results;
+		}
+
+		BYTE * GetNth(size_t N)
+		{
+			N -= 1;
+
+			if (m_results.size() > N)
+			{
+				return m_results[N];
+			}
+
+			return nullptr;
 		}
 	};
 
@@ -305,7 +475,7 @@ public:
 	{
 		auto s = State(m_mem);
 
-		s.m_curResults.push_back((BYTE *)offset);
+		s.m_results.push_back((BYTE *)offset);
 
 		return s;
 	}
@@ -314,14 +484,14 @@ public:
 	{
 		State s{ m_mem };
 
-		s.m_curResults = m_mem->FindAllBytes(bytes, m_mem->GetSectionByName(".text"), wildcard);
+		s.m_results = m_mem->FindAllBytes(bytes, m_mem->GetSectionByName(".text"), wildcard);
 
 		return s;
 	}
 
 	State FromCallTo(BYTE *function)
 	{
-		return FromOffset(function).FindCallsTo();
+		return FromOffset(function).FindCallsToCurrentAddress();
 	}
 
 	State FromImport(char *moduleName, char *procName)

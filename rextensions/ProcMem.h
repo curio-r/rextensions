@@ -91,21 +91,21 @@ public:
 	 * Find first occurence of reference to pointer
 	 * Equivalent to performing a search for the LE byte pattern of the address
 	 */
-	BYTE * FindReference(BYTE *refAddress, SEARCH_DIRECTION direction = SEARCH_DOWN);
+	BYTE * FindReference(BYTE *refAddress, SEGMENT segment, SEARCH_DIRECTION direction = SEARCH_DOWN);
 
 	/*
 	 * Find all references to pointer
 	 * Equivalent to performing a search for the LE byte pattern of the address
 	 */
-	std::vector<BYTE *> FindAllReferences(BYTE *refAddress, SEARCH_DIRECTION direction = SEARCH_DOWN);
+	std::vector<BYTE *> FindAllReferences(BYTE *refAddress, SEGMENT segment, SEARCH_DIRECTION direction = SEARCH_DOWN);
 
 	/*
 	 * Find all occurences of function calls to a given address
 	 */
-	std::vector<BYTE *> FindCallsTo(BYTE *procAddress, SEARCH_DIRECTION direction = SEARCH_DOWN);
+	std::vector<BYTE *> FindCallsTo(BYTE *procAddress, SEGMENT segment, SEARCH_DIRECTION direction = SEARCH_DOWN);
 
 	/*
-	 * Find string
+	 * Find string in data segments
 	 */
 	BYTE * FindDataString(const std::string &string);
 };

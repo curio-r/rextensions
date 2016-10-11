@@ -85,10 +85,13 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="astar.h" />
     <ClInclude Include="Composer.h" />
-    <ClInclude Include="overrides.h" />
+    <ClInclude Include="enum.h" />
+    <ClInclude Include="Hooks.h" />
     <ClInclude Include="ProcMem.h" />
     <ClInclude Include="Proxy.h" />
+    <ClInclude Include="ProxyImpl.h" />
     <ClInclude Include="rextensions.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="structs.h" />
@@ -104,8 +107,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
       </PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="overrides.cpp" />
+    <ClCompile Include="Hooks.cpp" />
     <ClCompile Include="ProcMem.cpp" />
+    <ClCompile Include="ProxyImpl.cpp" />
     <ClCompile Include="rextensions.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

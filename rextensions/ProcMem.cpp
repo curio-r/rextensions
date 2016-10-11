@@ -182,19 +182,19 @@ BYTE * ProcMem::GetImportTableAddress(const char * moduleName, const char *procN
 	return nullptr;
 }
 
-BYTE * ProcMem::FindReference(BYTE *refAddress, SEARCH_DIRECTION direction)
+BYTE * ProcMem::FindReference(BYTE *refAddress, SEGMENT segment, SEARCH_DIRECTION direction)
 {
-	return FindBytes((BYTE *)&refAddress, sizeof(BYTE *), GetSectionByName(".text"), false, direction);
+	return FindBytes((BYTE *)&refAddress, sizeof(BYTE *), segment, false, direction);
 }
 
-std::vector<BYTE *> ProcMem::FindAllReferences(BYTE *refAddress, SEARCH_DIRECTION direction)
+std::vector<BYTE *> ProcMem::FindAllReferences(BYTE *refAddress, SEGMENT segment, SEARCH_DIRECTION direction)
 {
-	return FindAllBytes((BYTE *)&refAddress, sizeof(BYTE *), GetSectionByName(".text"), false, direction);
+	return FindAllBytes((BYTE *)&refAddress, sizeof(BYTE *), segment, false, direction);
 }
 
-std::vector<BYTE *> ProcMem::FindCallsTo(BYTE *procAddress, SEARCH_DIRECTION direction)
+std::vector<BYTE *> ProcMem::FindCallsTo(BYTE *procAddress, SEGMENT segment, SEARCH_DIRECTION direction)
 {
-	return FindAllBytes({ 0xE8 }, GetSectionByName(".text"), false, direction, [procAddress](BYTE *refAddress)
+	return FindAllBytes({ 0xE8 }, segment, false, direction, [procAddress](BYTE *refAddress)
 	{
 		return ProcMem::DecodeCallAddress(refAddress) == (size_t)procAddress;
 	});
