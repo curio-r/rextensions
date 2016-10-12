@@ -273,6 +273,8 @@ static void RequestMove(int x, int y)
 	g_waitingForMove = true;
 }
 
+static size_t g_lastReset = 0;
+
 static void FollowPlan()
 {
 	if (g_playerX == 0 || g_playerY == 0)
@@ -281,9 +283,13 @@ static void FollowPlan()
 	}
 
 	if ((g_goalX == 0 && g_goalY == 0) || g_mustRecalculatePath ||
-		(g_waitingForMove && (int)timeGetTime_() > g_playerMoveStart + 5000))
+		(g_waitingForMove && (int)timeGetTime_() > g_playerMoveStart + 5000 &&
+		timeGetTime_() > g_lastReset + 5000))
 	{
 		PickGoal();
+
+		g_lastReset = timeGetTime_();
+		g_waitingForMove = false;
 	}
 
 	//if (g_mustRecalculatePath)
