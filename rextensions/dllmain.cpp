@@ -437,7 +437,7 @@ bool InstallHooks()
 	return false;
 }
 
-bool RemoveHook()
+bool RemoveHooks()
 {
 	DetourTransactionBegin();
 
@@ -467,6 +467,7 @@ bool RemoveHook()
 ProcMem *g_procFinder;
 BinarySearchComposer *g_composer;
 ClientGlobals *g_client;
+bool g_bHooksInstalled;
 
 BOOL APIENTRY DllMain( HMODULE hModule,
                        DWORD  ul_reason_for_call,
@@ -481,7 +482,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 			g_composer = new BinarySearchComposer(g_procFinder);
 			g_client = new ClientGlobals(g_composer);
 
-			InstallHooks();
+			g_bHooksInstalled = InstallHooks();
 		}
 		
 		break;
@@ -492,7 +493,10 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 		delete g_composer;
 		delete g_client;
 
-		RemoveHook();
+		if (g_bHooksInstalled)
+		{
+			RemoveHooks();
+		}
 
 		break;
 
