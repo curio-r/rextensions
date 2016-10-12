@@ -401,10 +401,18 @@ bool _AttachHook(T1 &&_Ptr, T2 &&_Fn, const std::string &_Name)
 	return true;
 }
 
+#define DetachHook(PTR, FN) _AttachHook(PTR, FN)
+template<typename T1, typename T2>
+bool DetachHook(T1 &&_Ptr, T2 &&_Fn)
+{
+	return DetourDetach((PVOID *)&_Ptr, (void *)_Fn) == NO_ERROR;
+}
+
+#define AttachMethodHook(CLASS, METHOD) AttachHook(proxy(CLASS) :: METHOD, void_cast(& CLASS##Hook :: METHOD))
+#define DetachMethodHook(CLASS, METHOD) DetachHook(proxy(CLASS) :: METHOD, void_cast(& CLASS##Hook :: METHOD))
+
 bool InstallHooks()
 {
-#define AttachMethodHook(CLASS, METHOD) AttachHook(proxy(CLASS) :: METHOD, void_cast(& CLASS##Hook :: METHOD))
-
 	DetourTransactionBegin();
 
 	if (AttachHook(CheckSystemMessage, CheckSystemMessageHook) &&
@@ -421,6 +429,33 @@ bool InstallHooks()
 	) {
 		DetourTransactionCommit();
 		
+		return true;
+	}
+
+	DetourTransactionAbort();
+
+	return false;
+}
+
+bool RemoveHook()
+{
+	DetourTransactionBegin();
+
+	if (DetachHook(CheckSystemMessage, CheckSystemMessageHook) &&
+		DetachMethodHook(CRenderer, DrawScene) &&
+		DetachMethodHook(CModeMgr, Switch) &&
+		DetachMethodHook(UIWindowMgr, MakeWindow) &&
+		DetachMethodHook(CRagConnection, SendPacket) &&
+		DetachMethodHook(CRagConnection, RecvPacket) &&
+		DetachMethodHook(CSession, GetTalkType) &&
+		DetachMethodHook(CWorld, OnEnterFrame) &&
+		DetachMethodHook(CActorPickNode, AddPickInfo) &&
+		DetachMethodHook(UIWindowMgr, HitTest) &&
+		DetachMethodHook(CMouse, ReadState)
+		) 
+	{
+		DetourTransactionCommit();
+
 		return true;
 	}
 
@@ -456,6 +491,8 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 		delete g_procFinder;
 		delete g_composer;
 		delete g_client;
+
+		RemoveHook();
 
 		break;
 
