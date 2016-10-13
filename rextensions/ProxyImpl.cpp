@@ -19,6 +19,10 @@ proxy(CMouse)::MethodRef<void(CMouse::*)(void)> proxy(CMouse)::ReadState;
 proxy(CResMgr)::MethodRef<void *(CResMgr::*)(char const *fNameInput)> proxy(CResMgr)::Get;
 CResMgr *(__cdecl *g_resMgr)() = nullptr;
 
+proxy(CFile)::MethodRef<bool (CFile::*)(const char *fName, unsigned long nOpenFlags)> proxy(CFile)::Open;
+proxy(CFile)::MethodRef<void (CFile::*)()> proxy(CFile)::Close;
+proxy(CFile)::MethodRef<bool (CFile::*)(void *lpBuf, unsigned long nCount)> proxy(CFile)::Read;
+
 proxy(CActorPickNode)::MethodRef<void(CActorPickNode::*)(CActorPickInfo *pickInfo)> proxy(CActorPickNode)::AddPickInfo;
 proxy(CGameMode)::MethodRef<void(CGameMode::*)(size_t actorGid, int attackOnce)> proxy(CGameMode)::ProceedAttack;
 

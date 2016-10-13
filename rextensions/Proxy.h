@@ -10,9 +10,14 @@ struct BaseProxy : public Class
 	{
 	private:
 
-		Func _Ptr;
+		Func _Ptr = nullptr;
 
 	public:
+
+		bool IsCallable()
+		{
+			return _Ptr != nullptr;
+		}
 
 		template<typename Type>
 		inline void operator=(Type Ptr)

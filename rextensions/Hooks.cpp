@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "Hooks.h"
 #include "enum.h"
-
+#include "MapColorTable.h"
 #include "astar.h"
 
 #include <chrono>
@@ -12,6 +12,7 @@
 #define MSG_COLOR_INFO 0xFFFF00u
 
 static const auto g_timeBegin = std::chrono::steady_clock::now();
+static bool g_mustUpdateMapColor = false;
 
 #define LOG_VERBOSE 0
 
@@ -633,6 +634,8 @@ void CWorldHook::OnEnterFrame()
 	g_playerDestY = 0;
 
 	proxy(CWorld)::OnEnterFrame(this);
+
+	g_mustUpdateMapColor = true;
 }
 
 // UIWindowMgr
@@ -682,6 +685,20 @@ size_t CModeMgrHook::Switch(int modeType, char *modeName)
 
 size_t CRendererHook::DrawScene()
 {
+	if (g_mustUpdateMapColor)
+	{
+		size_t color;
+
+		sprintf_s(msg, "%s.rsw", g_mapName.c_str());
+
+		if (GetMapColor(msg, color))
+		{
+			g_renderer->m_clearColor = color;
+		}
+
+		g_mustUpdateMapColor = false;
+	}
+
 	auto result = proxy(CRenderer)::DrawScene(this);
 
 	if (IsIdleMode())

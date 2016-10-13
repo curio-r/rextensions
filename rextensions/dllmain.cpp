@@ -9,6 +9,7 @@
 #include "Composer.h"
 #include "ProxyImpl.h"
 #include "Hooks.h"
+#include "MapColorTable.h"
 
 #define PROC_HOOK(NAME) GLOBAL_HOOK_##NAME
 
@@ -77,6 +78,32 @@ public:
 		{
 			ErrorMsg("Can't find mouse");
 		}
+
+		if (!FindCFile())
+		{
+			ErrorMsg("Can't find CFile");
+		}
+	}
+
+	bool FindCFile()
+	{
+		auto query = m_client->FromString("%s%s.gr2")
+			.FindReferences()
+			.FindBelow({
+				0xE8, 0xCC, 0xCC, 0xCC, 0xCC, // call ? (CFile::Open)
+				0x84, 0xC0 // test al, al
+			}, 200, true);
+
+		if (query.Count() == 0)
+		{
+			return false;
+		}
+
+		proxy(CFile)::Open = ProcMem::DecodeCallAddress(query.GetOne());
+
+		// TOOD: Locate CFile::Close
+
+		return true;
 	}
 
 	bool FindMouse()
@@ -483,6 +510,11 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 			g_client = new ClientGlobals(g_composer);
 
 			g_bHooksInstalled = InstallHooks();
+
+			if (g_bHooksInstalled)
+			{
+				InitMapColorTable();
+			}
 		}
 		
 		break;
@@ -508,4 +540,3 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 
 	return TRUE;
 }
-

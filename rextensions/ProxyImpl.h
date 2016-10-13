@@ -108,6 +108,13 @@ struct proxy(CWorld) : public ClassProxy<CWorld>
 	static MethodRef<void(CWorld::*)(void)> OnEnterFrame;
 };
 
+struct proxy(CFile) : public ClassProxy<CFile>
+{
+	static MethodRef<bool (CFile::*)(const char *fName, unsigned long nOpenFlags)> Open;
+	static MethodRef<void (CFile::*)()> Close;
+	static MethodRef<bool (CFile::*)(void *lpBuf, unsigned long nCount)> Read;
+};
+
 struct proxy(CRagConnection) : public ClassProxy<CRagConnection>
 {
 	static MethodRef<size_t(CRagConnection::*)(void)> OnSend;

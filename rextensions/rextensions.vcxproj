@@ -82,13 +82,12 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="astar.h" />
+    <ClInclude Include="CommonObject.h" />
     <ClInclude Include="Composer.h" />
     <ClInclude Include="enum.h" />
     <ClInclude Include="Hooks.h" />
+    <ClInclude Include="MapColorTable.h" />
     <ClInclude Include="ProcMem.h" />
     <ClInclude Include="Proxy.h" />
     <ClInclude Include="ProxyImpl.h" />
@@ -99,6 +98,7 @@
     <ClInclude Include="win32.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CommonObject.cpp" />
     <ClCompile Include="dllmain.cpp">
       <CompileAsManaged Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</CompileAsManaged>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -108,6 +108,7 @@
       </PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="Hooks.cpp" />
+    <ClCompile Include="MapColorTable.cpp" />
     <ClCompile Include="ProcMem.cpp" />
     <ClCompile Include="ProxyImpl.cpp" />
     <ClCompile Include="rextensions.cpp" />

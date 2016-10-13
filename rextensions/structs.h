@@ -4,6 +4,67 @@
 #include <vector>
 #include "enum.h"
 
+struct CFile
+{
+	enum SeekPosition
+	{
+		begin = 0x0,
+		current = 0x1,
+		end = 0x2,
+	};
+
+	enum OpenFlags
+	{
+		modeRead = 0x0,
+		modeWrite = 0x1,
+		modeReadWrite = 0x2,
+		shareCompat = 0x0,
+		shareExclusive = 0x10,
+		shareDenyWrite = 0x20,
+		shareDenyRead = 0x30,
+		shareDenyNone = 0x40,
+		modeNoInherit = 0x80,
+		modeCreate = 0x1000,
+		modeNoTruncate = 0x2000,
+		typeText = 0x4000,
+		typeBinary = 0x8000,
+	};
+
+	inline CFile()
+	{
+		m_hFile = nullptr;
+		m_buf = nullptr;
+		m_size = 0;
+		m_cursor = 0;
+	}
+
+	bool CFile::Read(void *lpBuf, unsigned long nCount)
+	{
+		if (m_hFile != nullptr)
+		{
+			// Oops
+
+			return false;
+		}
+
+		if (m_buf != nullptr && (m_cursor + nCount <= m_size)) // <= correct?
+		{
+			memcpy(lpBuf, &m_buf[m_cursor], nCount);
+			m_cursor += nCount;
+			
+			return true;
+		}
+
+		return false;
+	}
+
+	void* m_hFile;
+	unsigned char* m_buf;
+	unsigned long m_cursor;
+	unsigned long m_size;
+	char m_fileName[128];
+};
+
 struct CAttrCell
 {
 	float h1;
