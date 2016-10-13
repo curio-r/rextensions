@@ -83,6 +83,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="astar.h" />
+    <ClInclude Include="buildconfig.h" />
     <ClInclude Include="CommonObject.h" />
     <ClInclude Include="Composer.h" />
     <ClInclude Include="enum.h" />

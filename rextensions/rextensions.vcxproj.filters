@@ -57,6 +57,9 @@
     <ClInclude Include="MapColorTable.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="buildconfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

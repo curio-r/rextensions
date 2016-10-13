@@ -11,6 +11,8 @@
 #include "Detours Express 3.0\include\detours.h"
 #pragma comment(lib, "Detours Express 3.0\\lib.X86\\detours.lib")
 
+#include "buildconfig.h"
+
 template<typename T>
 union _void_cast_u
 {

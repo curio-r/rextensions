@@ -685,6 +685,7 @@ size_t CModeMgrHook::Switch(int modeType, char *modeName)
 
 size_t CRendererHook::DrawScene()
 {
+#ifndef DISABLE_MAPCOLORTABLE
 	if (g_mustUpdateMapColor)
 	{
 		size_t color;
@@ -698,6 +699,7 @@ size_t CRendererHook::DrawScene()
 
 		g_mustUpdateMapColor = false;
 	}
+#endif
 
 	auto result = proxy(CRenderer)::DrawScene(this);
 
@@ -792,6 +794,7 @@ size_t CRagConnectionHook::SendPacket(size_t size, char *buf)
 
 int CSessionHook::GetTalkType(const char *chatBuf, enum TALKTYPE *talkType, void *param)
 {
+#ifndef DISABLE_IDLE_MODE
 	if (_strcmpi("/idle", chatBuf) == 0 ||
 		_strcmpi("/auto", chatBuf) == 0)
 	{
@@ -831,6 +834,7 @@ int CSessionHook::GetTalkType(const char *chatBuf, enum TALKTYPE *talkType, void
 
 		return -1;
 	}
+#endif
 
 	//if (chatBuf != nullptr)
 	//{

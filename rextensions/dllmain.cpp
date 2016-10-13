@@ -511,10 +511,12 @@ BOOL APIENTRY DllMain( HMODULE hModule,
 
 			g_bHooksInstalled = InstallHooks();
 
+#ifndef DISABLE_MAPCOLORTABLE
 			if (g_bHooksInstalled)
 			{
 				InitMapColorTable();
 			}
+#endif
 		}
 		
 		break;
